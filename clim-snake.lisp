@@ -8,7 +8,6 @@
 (defparameter *board-height* 40)
 (defparameter *y-offset* 20)
 (defparameter *sleep-time* 0.1)
-(defvar *game-running* nil)
 
 ;;; Generic functions
 
@@ -44,10 +43,6 @@
   (make-instance 'snake))
 
 (defmethod set-dir ((s snake) dir)
-  (assert (or (eq dir 'up)
-	      (eq dir 'down)
-	      (eq dir 'left)
-	      (eq dir 'right)))
   (setf (snake-dir s) dir))
 
 (defmethod snake-head ((s snake))
@@ -217,31 +212,33 @@
   (queue-event (frame-top-level-sheet frame)
 	       (make-instance 'refresh-event
 			      :sheet frame))
-  (loop while (eq (snake-state (app-snake frame)) 'alive)
-     do
-       (progn
-	 (sleep *sleep-time*)
-	 (advance-snake (app-snake frame))
-	 (when (apple-eaten? (app-snake frame) (app-apple frame))
-	   (incf (app-score frame) 100)
-	   (setf (app-apple frame) (make-apple))
-	   (incf (snake-growth-points (app-snake frame)) 5))
-	 (queue-event (frame-top-level-sheet frame)
-		      (make-instance 'refresh-event
-				     :sheet frame)))))
+  (unwind-protect
+       (loop while (eq (snake-state (app-snake frame)) 'alive)
+	  do
+	    (progn
+	      (sleep *sleep-time*)
+	      (advance-snake (app-snake frame))
+	      (when (apple-eaten? (app-snake frame) (app-apple frame))
+		(incf (app-score frame) 100)
+		(setf (app-apple frame) (make-apple))
+		(incf (snake-growth-points (app-snake frame)) 5))
+	      (queue-event (frame-top-level-sheet frame)
+			   (make-instance 'refresh-event
+					  :sheet frame))))
+    (setf (snake-state (app-snake frame)) 'dead)))
 
 (define-snake-app-command (com-new :name t)
     ()
   (let ((frame *application-frame*))
-    (unless *game-running*
+    (when (or (null (app-snake frame))
+	      (eq (snake-state (app-snake frame)) 'dead))
       (clim-sys:make-process
        #'(lambda ()
 	   (setf *game-running* t)
 	   (setf (app-snake frame) (make-snake))
 	   (setf (app-apple frame) (make-apple))
 	   (setf (app-score frame) 0)
-	   (play-snake frame)
-	   (setf *game-running* nil))))))
+	   (play-snake frame))))))
 
 (define-snake-app-command (com-quit :name t)
     ()
