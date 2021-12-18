@@ -110,16 +110,6 @@
   (when (equalp (snake-head s) (apple-pos a))
     t))
 
-;;; GUI + Objects
-
-(defmethod draw-snake ((s snake) pane)
-  (map nil #'(lambda (p)
-	       (plot pane (pos-x p) (pos-y p) +yellow+))
-       (snake-cells s)))
-
-(defmethod draw-apple ((a apple) pane)
-  (plotc pane (pos-x (apple-pos a)) (pos-y (apple-pos a)) +red+))
-
 ;;; GUI
 
 (defclass board-pane (clim-stream-pane)
@@ -134,7 +124,6 @@
    (app (make-pane 'board-pane
 		   :display-time t
 		   :display-function 'display-app
-		   :double-buffering t
 		   :height (+ (* *board-height* 10) *y-offset*)
 		   :width (* *board-width* 10))))
   (:layouts
@@ -164,6 +153,38 @@
   (draw-circle* pane (+ (* x 10) 5) (+ (* y 10) 5 *y-offset*) 5
 		:ink color))
 
+;;; GUI + Objects
+
+(defmethod draw-snake ((s snake) pane)
+  (map nil #'(lambda (p)
+	       (plot pane (pos-x p) (pos-y p) +yellow+))
+       (snake-cells s)))
+
+(defmethod draw-apple ((a apple) pane)
+  (plotc pane (pos-x (apple-pos a)) (pos-y (apple-pos a)) +red+))
+
+(defun draw-board (pane snake apple score)
+  (cond ((eq (snake-state snake) 'dead)
+	 (window-clear pane)
+	 (draw-text* pane "Your snake died!"
+		     (- (* *board-width* 5) 40)
+		     (- (* *board-height* 5) 6))
+	 (draw-text* pane (format nil "Score: ~d" score)
+		     (- (* *board-width* 5) 40)
+		     (+ (* *board-height* 5) 6)))
+	(t
+	 (draw-rectangle* pane 0 0 (* *board-width* 10) *y-offset*
+			  :ink +white+)
+	 (draw-rectangle* pane
+			  0 *y-offset*
+			  (* *board-width* 10)
+			  (+ (* *board-height* 10) *y-offset*) :ink +blue+)
+	 (draw-text* pane (format nil "Score ~d" score) 0 10)
+	 (draw-apple apple pane)
+	 (draw-snake snake pane))))
+
+;;; Event handling
+
 (defclass refresh-event (window-manager-event) ())
 
 (defmethod handle-event ((frame snake-app) (event refresh-event))
@@ -188,25 +209,7 @@
 		(app-apple *application-frame*)
 		(app-score *application-frame*))))
 
-(defun draw-board (pane snake apple score)
-  (cond ((eq (snake-state snake) 'dead)
-	 (window-clear pane)
-	 (draw-text* pane "Your snake died!"
-		     (- (* *board-width* 5) 40)
-		     (- (* *board-height* 5) 6))
-	 (draw-text* pane (format nil "Score: ~d" score)
-		     (- (* *board-width* 5) 40)
-		     (+ (* *board-height* 5) 6)))
-	(t
-	 (draw-rectangle* pane 0 0 (* *board-width* 10) *y-offset*
-			  :ink +white+)
-	 (draw-rectangle* pane
-			  0 *y-offset*
-			  (* *board-width* 10)
-			  (+ (* *board-height* 10) *y-offset*) :ink +blue+)
-	 (draw-text* pane (format nil "Score ~d" score) 0 10)
-	 (draw-apple apple pane)
-	 (draw-snake snake pane))))
+;;; Game loop
 
 (defun play-snake (frame)
   (queue-event (frame-top-level-sheet frame)
@@ -234,7 +237,6 @@
 	      (eq (snake-state (app-snake frame)) 'dead))
       (clim-sys:make-process
        #'(lambda ()
-	   (setf *game-running* t)
 	   (setf (app-snake frame) (make-snake))
 	   (setf (app-apple frame) (make-apple))
 	   (setf (app-score frame) 0)
